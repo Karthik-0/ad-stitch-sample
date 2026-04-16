@@ -263,6 +263,25 @@
       cursor: pointer;
     }
 
+    /* Quality selector */
+    #qualitySelect {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      min-width: 100px;
+    }
+    #qualitySelect:hover {
+      background: var(--surface);
+    }
+    #qualitySelect option {
+      background: var(--surface);
+      color: var(--text);
+    }
+
     /* Quick tips */
     .tip { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
     .tip code {
@@ -413,6 +432,12 @@
         <div class="pb-item">Buffered: <strong id="pbBuffered">—</strong></div>
         <div class="pb-item">Resolution: <strong id="pbRes">—</strong></div>
         <div class="pb-item">Session: <strong id="pbSid" style="font-size:0.75rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</strong></div>
+        <div class="pb-item">
+          Quality:
+          <select id="qualitySelect" style="display:none">
+            <option value="">Auto</option>
+          </select>
+        </div>
       </div>
 
       <div class="seek-wrap" id="seekWrap">
@@ -592,6 +617,94 @@
       const useCustom = $('adTagPreset').value === '__custom__';
       $('customAdTagWrap').style.display = useCustom ? '' : 'none';
     });
+
+    function setupQualitySelector(vjsPlayer) {
+      const select = $('qualitySelect');
+      if (!vjsPlayer || !vjsPlayer.tech_) {
+        return; // Not a Video.js HLS player
+      }
+
+      const tech = vjsPlayer.tech_;
+      let hls = tech.hls || tech.vhs;
+      if (!hls) return;
+
+      const updateQualityList = () => {
+        try {
+          const master = hls.playlists && hls.playlists.master;
+          if (!master || !master.playlists) return;
+
+          select.innerHTML = '<option value="">Auto (Adaptive)</option>';
+          const levels = [];
+
+          master.playlists.forEach((playlist, idx) => {
+            let label = `Level ${idx}`;
+            
+            // Try to extract resolution from RESOLUTION attribute
+            if (playlist.attributes && playlist.attributes.RESOLUTION) {
+              label = playlist.attributes.RESOLUTION;
+            }
+            // Or derive from bandwidth
+            else if (playlist.attributes && playlist.attributes.BANDWIDTH) {
+              const bw = parseInt(playlist.attributes.BANDWIDTH, 10);
+              label = `${(bw / 1000).toFixed(0)} kbps`;
+            }
+
+            levels.push({ label, index: idx, bandwidth: parseInt(playlist.attributes?.BANDWIDTH || 0, 10) });
+          });
+
+          // Sort by bandwidth ascending
+          levels.sort((a, b) => a.bandwidth - b.bandwidth);
+          
+          levels.forEach(level => {
+            const opt = document.createElement('option');
+            opt.value = String(level.index);
+            opt.textContent = level.label;
+            select.appendChild(opt);
+          });
+
+          if (levels.length > 1) {
+            select.style.display = '';
+            log(`Available qualities: ${levels.map(l => l.label).join(', ')}`, 'dim');
+          }
+        } catch (e) {
+          console.debug('setupQualitySelector: error updating list', e);
+        }
+      };
+
+      // Listen for HLS.js events if available
+      if (hls.on) {
+        hls.on('hlsManifestParsed', updateQualityList);
+        hls.on('hlsLevelSwitching', (event, data) => {
+          select.value = String(data.level);
+        });
+      }
+
+      // Handle manual quality selection
+      select.addEventListener('change', (e) => {
+        const val = e.target.value;
+        try {
+          if (val === '') {
+            // Auto/adaptive mode: select highest quality
+            if (hls.nextLevel !== undefined) {
+              const max = hls.levels.length - 1;
+              hls.nextLevel = max;
+            }
+          } else {
+            const levelIdx = parseInt(val, 10);
+            if (hls.nextLevel !== undefined) {
+              hls.nextLevel = levelIdx;
+            }
+          }
+        } catch (e) {
+          console.debug('setupQualitySelector: error switching level', e);
+        }
+      });
+
+      // Try initial population
+      updateQualityList();
+      setTimeout(updateQualityList, 500);
+      setTimeout(updateQualityList, 2000);
+    }
 
     /* ── Session creation ──────────────────────────────── */
     async function createSession() {
@@ -817,6 +930,9 @@
         log(`Player error: ${err ? err.message : 'unknown'}`, 'err');
         $('pbState').textContent = 'Error';
       });
+
+      // Quality selector via HLS.js
+      setupQualitySelector(player);
 
       return player;
     }
