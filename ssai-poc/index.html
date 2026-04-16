@@ -435,8 +435,13 @@
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
-        applySession(data.session_id, data.master_url);
+        // Build the playback URL from the current page origin to avoid
+        // mixed-content/proxy-origin issues in production deployments.
+        const effectiveMasterUrl = `${window.location.origin}/session/${data.session_id}/master.m3u8`;
+        applySession(data.session_id, effectiveMasterUrl);
         log(`Session created: ${data.session_id}`, 'ok');
+        log(`Master URL: ${effectiveMasterUrl}`, 'dim');
+        loadSessionStream();
       } catch (err) {
         log(`Failed to create session: ${err.message}`, 'err');
       } finally {
@@ -447,6 +452,7 @@
     function applySession(sid, url) {
       sessionId = sid;
       masterUrl = url;
+      $('manualUrl').value = url;
 
       $('dispSid').textContent = sid.slice(0, 8) + '…';
       $('dispSid').title = sid;
@@ -474,6 +480,7 @@
       const base = window.location.origin;
       applySession(sid, `${base}/session/${sid}/master.m3u8`);
       log(`Loaded existing session ${sid}`, 'ok');
+      loadSessionStream();
     }
 
     /* ── Ad break trigger ──────────────────────────────── */

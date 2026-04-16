@@ -87,7 +87,7 @@ Before handing off to Supervisor, confirm the app runs cleanly:
 cd /srv/ssai/ssai-poc
 
 LIVE_DIR=/srv/ssai/ffmpeg-outputs \
-  /srv/ssai/ssai-poc/.venv/bin/uvicorn main:app \
+  /srv/ssai/ssai-poc/.venv/bin/python -m uvicorn main:app \
   --host 0.0.0.0 --port 8000
 
 # Should print: INFO: Application startup complete.
@@ -109,7 +109,7 @@ Paste the following (update paths if you installed elsewhere):
 
 ```ini
 [program:ssai]
-command=/srv/ssai/ssai-poc/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+command=/srv/ssai/ssai-poc/.venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000
 directory=/srv/ssai/ssai-poc
 user=www-data
 autostart=true
@@ -131,6 +131,11 @@ sudo chown www-data:www-data /var/log/ssai
 ```
 
 > If you are not using `www-data`, replace `user=www-data` with your own user (`whoami`).
+
+Important:
+
+- Do not run Supervisor with `user=www-data` against code in `/home/root/...` because `www-data` usually cannot traverse `/home/root`.
+- Prefer deploying under `/srv/ssai` (as shown above), or run the program as a user that has execute permissions on every parent directory.
 
 ---
 
@@ -234,6 +239,8 @@ server {
         proxy_set_header   Host $host;
         proxy_set_header   X-Real-IP $remote_addr;
         proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header   X-Forwarded-Proto $scheme;
+      proxy_set_header   X-Forwarded-Host $host;
         proxy_read_timeout 120s;
     }
 }
