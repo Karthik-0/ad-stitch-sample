@@ -21,13 +21,12 @@ This guide explains how to run, test, and troubleshoot the Server-Side Ad Stitch
 Run these commands from this directory.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv venv .venv
+uv pip install -r requirements.txt
 docker compose up -d
 
 # Start stitcher
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 In another terminal:
@@ -165,10 +164,9 @@ Stop FFmpeg with `Ctrl+C`.
 From the `ssai-poc` folder:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uv venv .venv
+uv pip install -r requirements.txt
+.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Verify stitcher health:

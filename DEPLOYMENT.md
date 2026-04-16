@@ -8,19 +8,21 @@ This guide covers deploying the SSAI FastAPI server on a Linux server (Ubuntu/De
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y python3 python3-venv python3-pip ffmpeg supervisor git
+sudo apt-get install -y python3 ffmpeg supervisor git curl
 ```
 
-Verify FFmpeg has libx264:
+Install **uv** (fast Python package and virtualenv manager):
 
 ```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env   # or restart your shell
+```
+
+Verify:
+
+```bash
+uv --version
 ffmpeg -version | grep libx264
-```
-
-Verify Python:
-
-```bash
-python3 --version   # must be 3.11+
 ```
 
 ---
@@ -38,11 +40,11 @@ cd /srv/ssai
 
 ```bash
 cd /srv/ssai/ssai-poc
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+uv venv .venv
+uv pip install -r requirements.txt
 ```
+
+`uv` creates the venv and installs dependencies in a single fast pass — no need to activate first.
 
 ---
 
@@ -85,7 +87,7 @@ Before handing off to Supervisor, confirm the app runs cleanly:
 cd /srv/ssai/ssai-poc
 
 LIVE_DIR=/srv/ssai/ffmpeg-outputs \
-  /srv/ssai/ssai-poc/.venv/bin/python -m uvicorn main:app \
+  /srv/ssai/ssai-poc/.venv/bin/uvicorn main:app \
   --host 0.0.0.0 --port 8000
 
 # Should print: INFO: Application startup complete.
@@ -107,7 +109,7 @@ Paste the following (update paths if you installed elsewhere):
 
 ```ini
 [program:ssai]
-command=/srv/ssai/ssai-poc/.venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000
+command=/srv/ssai/ssai-poc/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 directory=/srv/ssai/ssai-poc
 user=www-data
 autostart=true
@@ -188,7 +190,8 @@ After any code change:
 ```bash
 cd /srv/ssai
 git pull
-sudo supervisorctl restart ssai
+cd ssai-poc && uv pip install -r requirements.txt   # sync deps if requirements changed
+cd .. && sudo supervisorctl restart ssai
 ```
 
 ---
