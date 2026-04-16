@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="4.2">
+  <Ad id="ad-inline-1">
+    <InLine>
+      <Impression><![CDATA[https://tracker.example.com/impression?cb=[CACHEBUSTING]]]></Impression>
+      <Creatives>
+        <Creative id="creative-inline-1">
+          <Linear>
+            <Duration>00:00:30.500</Duration>
+            <TrackingEvents>
+              <Tracking event="start"><![CDATA[https://tracker.example.com/start?cb=[CACHEBUSTING]]]></Tracking>
+              <Tracking event="firstQuartile"><![CDATA[https://tracker.example.com/q1?cb=[CACHEBUSTING]]]></Tracking>
+            </TrackingEvents>
+            <VideoClicks>
+              <ClickThrough><![CDATA[https://click.example.com/landing]]></ClickThrough>
+            </VideoClicks>
+            <MediaFiles>
+              <MediaFile delivery="streaming" type="video/mp4" bitrate="1500"><![CDATA[https://cdn.example.com/streaming.mp4]]></MediaFile>
+              <MediaFile delivery="progressive" type="video/mp4" bitrate="1000"><![CDATA[https://cdn.example.com/low.mp4]]></MediaFile>
+              <MediaFile delivery="progressive" type="video/mp4" bitrate="2000"><![CDATA[https://cdn.example.com/high.mp4]]></MediaFile>
+            </MediaFiles>
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

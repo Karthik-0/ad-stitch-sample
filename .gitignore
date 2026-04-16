@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# FFmpeg live/output directories — large binary files, not for version control
+ffmpeg-outputs/
+ssai-poc/storage/live/
+ssai-poc/storage/ads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+/var/log/
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets / env
+.env
+*.env

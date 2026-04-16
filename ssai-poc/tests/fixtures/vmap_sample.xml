@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vmap:VMAP xmlns:vmap="http://www.iab.net/videosuite/vmap" version="1.0">
+  <vmap:AdBreak breakId="preroll" timeOffset="start">
+    <vmap:AdSource id="adsource1" allowMultipleAds="false" followRedirects="true">
+      <vmap:AdTagURI templateType="vast3"><![CDATA[https://ads.example.com/preroll-vast]]></vmap:AdTagURI>
+    </vmap:AdSource>
+  </vmap:AdBreak>
+  <vmap:AdBreak breakId="midroll-1" timeOffset="00:10:00">
+    <vmap:AdSource id="adsource2" allowMultipleAds="true" followRedirects="true">
+      <vmap:AdTagURI templateType="vast3"><![CDATA[https://ads.example.com/midroll-vast]]></vmap:AdTagURI>
+    </vmap:AdSource>
+  </vmap:AdBreak>
+  <vmap:AdBreak breakId="broken" timeOffset="00:20:00">
+    <vmap:AdSource id="adsource3" allowMultipleAds="true" followRedirects="true" />
+  </vmap:AdBreak>
+</vmap:VMAP>

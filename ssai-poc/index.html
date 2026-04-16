@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SSAI Control Room</title>
+  <link href="https://vjs.zencdn.net/8.16.1/video-js.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0f1e;
+      --surface: #111827;
+      --surface2: #1e2535;
+      --border: #2a3549;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --green: #22c55e;
+      --green-dark: #052e16;
+      --orange: #f97316;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --badge-bg: #1e293b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "SF Pro Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    header {
+      max-width: 1200px;
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header .logo { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.5px; }
+    header .logo span { color: var(--green); }
+    .tag {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: var(--badge-bg);
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      border-radius: 6px;
+      color: var(--muted);
+    }
+    .tag.live { border-color: var(--green); color: var(--green); }
+
+    .layout {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    /* --- Sidebar --- */
+    .sidebar { display: flex; flex-direction: column; gap: 14px; }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .panel-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    /* Session panel */
+    .session-info {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 0.85rem;
+    }
+    .session-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .session-label { color: var(--muted); flex-shrink: 0; }
+    .session-val {
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 160px;
+    }
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .copy-btn:hover { background: var(--surface2); color: var(--text); }
+
+    .state-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .state-none     { background: #1e293b; color: var(--muted); }
+    .state-pending  { background: #422006; color: var(--orange); }
+    .state-active   { background: #052e16; color: var(--green); }
+    .state-completed { background: #1e293b; color: #a8b3c5; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter 0.15s, opacity 0.15s;
+      width: 100%;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn:not(:disabled):hover { filter: brightness(1.08); }
+
+    .btn-primary { background: var(--green); color: var(--green-dark); }
+    .btn-warning { background: var(--orange); color: #431407; }
+    .btn-danger  { background: var(--red);    color: #1c0000; }
+    .btn-ghost   {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-ghost:not(:disabled):hover { background: var(--surface2); }
+
+    /* Ad break form */
+    .form-row { display: flex; gap: 8px; align-items: center; }
+    .form-label { font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; display: block; }
+
+    input[type="number"], input[type="text"], input[type="url"] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-size: 0.88rem;
+      outline: none;
+      width: 100%;
+    }
+    input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(34,197,94,0.15); }
+    input[type="number"] { width: 80px; flex-shrink: 0; }
+
+    /* Log */
+    .log {
+      font-family: monospace;
+      font-size: 0.77rem;
+      line-height: 1.6;
+      background: #070c18;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      height: 200px;
+      overflow-y: auto;
+      color: #7dd3fc;
+    }
+    .log .log-ok   { color: #86efac; }
+    .log .log-err  { color: #fca5a5; }
+    .log .log-warn { color: #fcd34d; }
+    .log .log-dim  { color: var(--muted); }
+
+    /* Player area */
+    .player-area { display: flex; flex-direction: column; gap: 14px; }
+
+    .player-wrap {
+      background: #000;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      aspect-ratio: 16/9;
+      position: relative;
+    }
+    .player-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .player-placeholder .icon { font-size: 2.5rem; opacity: 0.3; }
+    .video-js { width: 100%!important; height: 100%!important; }
+
+    /* Playback info bar */
+    .pb-bar {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--muted);
+      align-items: center;
+    }
+    .pb-item { display: flex; gap: 5px; }
+    .pb-item strong { color: var(--text); }
+
+    /* Quick tips */
+    .tip { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
+    .tip code {
+      background: var(--surface2);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.75rem;
+      color: #93c5fd;
+    }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">SSAI <span>Control Room</span></div>
+    <span class="tag" id="liveTag">OFFLINE</span>
+  </header>
+
+  <div class="layout">
+
+    <!-- =========== SIDEBAR =========== -->
+    <aside class="sidebar">
+
+      <!-- Session -->
+      <div class="panel">
+        <div class="panel-title">Session</div>
+
+        <div class="session-info" id="sessionInfo" style="display:none">
+          <div class="session-row">
+            <span class="session-label">Session ID</span>
+            <span class="session-val" id="dispSid" title=""></span>
+            <button class="copy-btn" onclick="copyText(document.getElementById('dispSid').title)">Copy</button>
+          </div>
+          <div class="session-row">
+            <span class="session-label">Ad State</span>
+            <span class="state-badge state-none" id="adStateBadge">none</span>
+          </div>
+          <div class="session-row">
+            <span class="session-label">Content</span>
+            <span class="session-val" id="dispContentId">—</span>
+          </div>
+        </div>
+        <div id="noSession" class="tip" style="margin-bottom:12px">
+          No active session. Click <strong>New Session</strong> to start.
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="margin-bottom:4px">
+            <label class="form-label" for="contentIdInput">Content ID</label>
+            <input type="text" id="contentIdInput" value="demo" placeholder="demo">
+          </div>
+          <button class="btn btn-primary" id="newSessionBtn" onclick="createSession()">
+            ▶ New Session
+          </button>
+          <button class="btn btn-ghost" id="loadExistingBtn" onclick="toggleManualEntry()">
+            Load Existing Session
+          </button>
+          <div id="manualEntry" style="display:none; margin-top:4px">
+            <label class="form-label">Session ID</label>
+            <div class="form-row">
+              <input type="text" id="manualSid" placeholder="paste session ID">
+              <button class="btn btn-ghost" style="width:auto;padding:9px 14px" onclick="loadManualSession()">Load</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ad Break Controls -->
+      <div class="panel">
+        <div class="panel-title">Ad Insertion</div>
+
+        <div style="margin-bottom:12px">
+          <label class="form-label" for="adDuration">Insert ad in <strong id="durationLabel">30</strong> seconds</label>
+          <input type="range" id="adDurationSlider" min="6" max="120" step="6" value="30"
+            style="width:100%;accent-color:var(--orange);cursor:pointer;margin-bottom:6px"
+            oninput="document.getElementById('durationLabel').textContent=this.value; document.getElementById('adDuration').value=this.value">
+          <div class="form-row">
+            <span class="form-label" style="margin:0;white-space:nowrap">Exact seconds:</span>
+            <input type="number" id="adDuration" value="30" min="1" max="120"
+              oninput="document.getElementById('adDurationSlider').value=this.value; document.getElementById('durationLabel').textContent=this.value">
+          </div>
+        </div>
+
+        <button class="btn btn-warning" id="triggerBtn" onclick="triggerAdBreak()" disabled>
+          📣 Insert Ad Break
+        </button>
+
+        <div style="margin-top:8px;font-size:0.75rem;color:var(--muted);line-height:1.5">
+          Ad will appear approximately <span id="durationSummary">30</span>s after current playback position.
+          Actual insertion is segment-aligned (rounded up to next 6s boundary).
+        </div>
+      </div>
+
+      <!-- Player URL -->
+      <div class="panel">
+        <div class="panel-title">Player URL</div>
+        <div class="form-row">
+          <input type="url" id="manualUrl" placeholder="http://…/master.m3u8" autocomplete="off">
+          <button class="btn btn-ghost" style="width:auto;padding:9px 14px" onclick="loadManualUrl()">Load</button>
+        </div>
+        <div style="margin-top:8px">
+          <button class="btn btn-ghost" id="loadSessionUrl" onclick="loadSessionStream()" disabled>
+            Load Session Stream
+          </button>
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div class="panel" style="padding-bottom:10px">
+        <div class="panel-title" style="display:flex;justify-content:space-between">
+          Activity Log
+          <button class="copy-btn" onclick="document.getElementById('log').innerHTML=''">Clear</button>
+        </div>
+        <div class="log" id="log"></div>
+      </div>
+
+    </aside>
+
+    <!-- =========== PLAYER AREA =========== -->
+    <div class="player-area">
+      <div class="player-wrap">
+        <div class="player-placeholder" id="placeholder">
+          <div class="icon">▶</div>
+          <div>Create a session to start streaming</div>
+        </div>
+        <video id="ssaiPlayer" class="video-js vjs-default-skin" controls preload="auto" style="display:none"></video>
+      </div>
+
+      <div class="pb-bar" id="pbBar" style="display:none">
+        <div class="pb-item">State: <strong id="pbState">—</strong></div>
+        <div class="pb-item">Buffered: <strong id="pbBuffered">—</strong></div>
+        <div class="pb-item">Resolution: <strong id="pbRes">—</strong></div>
+        <div class="pb-item">Session: <strong id="pbSid" style="font-size:0.75rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</strong></div>
+      </div>
+
+      <!-- Quick tips panel -->
+      <div class="panel tip">
+        <div class="panel-title">How It Works</div>
+        <ol style="padding-left:16px;line-height:2">
+          <li>Click <strong>New Session</strong> — the server creates a session and fetches the pre-roll ad.</li>
+          <li>Click <strong>Load Session Stream</strong> — player opens the personalised master playlist.</li>
+          <li>The pre-roll plays first, then transitions seamlessly to live content.</li>
+          <li>During live playback, set a delay and click <strong>Insert Ad Break</strong>. The stitcher will inject the ad <em>approximately</em> that many seconds from now.</li>
+          <li>The player never stops — ad segments are stitched server-side; the player sees a continuous stream.</li>
+        </ol>
+        <div style="margin-top:10px">
+          Test with Chrome + <code>hls.js</code> or Safari native HLS. For diagnostics, open browser DevTools → Network and filter for <code>.m3u8</code>.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://vjs.zencdn.net/8.16.1/video.min.js"></script>
+  <script>
+    /* ── State ─────────────────────────────────────────── */
+    let sessionId = null;
+    let masterUrl = null;
+    let player = null;
+    let statePollTimer = null;
+
+    /* ── Helpers ───────────────────────────────────────── */
+    const $ = id => document.getElementById(id);
+
+    function log(msg, type = 'dim') {
+      const el = $('log');
+      const line = document.createElement('div');
+      line.className = `log-${type}`;
+      const ts = new Date().toLocaleTimeString();
+      line.textContent = `[${ts}] ${msg}`;
+      el.appendChild(line);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => log('Copied to clipboard.', 'dim'));
+    }
+
+    function setAdState(state) {
+      const badge = $('adStateBadge');
+      badge.textContent = state;
+      badge.className = `state-badge state-${state}`;
+    }
+
+    function syncDuration() {
+      const v = $('adDuration').value;
+      $('durationLabel').textContent = v;
+      $('durationSummary').textContent = v;
+      $('adDurationSlider').value = v;
+    }
+
+    $('adDuration').addEventListener('input', syncDuration);
+
+    /* ── Session creation ──────────────────────────────── */
+    async function createSession() {
+      const contentId = $('contentIdInput').value.trim() || 'demo';
+      $('newSessionBtn').disabled = true;
+      log(`Creating session (content_id=${contentId})…`);
+      try {
+        const resp = await fetch('/session/new', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content_id: contentId, preroll: true }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        applySession(data.session_id, data.master_url);
+        log(`Session created: ${data.session_id}`, 'ok');
+      } catch (err) {
+        log(`Failed to create session: ${err.message}`, 'err');
+      } finally {
+        $('newSessionBtn').disabled = false;
+      }
+    }
+
+    function applySession(sid, url) {
+      sessionId = sid;
+      masterUrl = url;
+
+      $('dispSid').textContent = sid.slice(0, 8) + '…';
+      $('dispSid').title = sid;
+      $('dispContentId').textContent = $('contentIdInput').value.trim() || 'demo';
+      $('sessionInfo').style.display = '';
+      $('noSession').style.display = 'none';
+      $('triggerBtn').disabled = false;
+      $('loadSessionUrl').disabled = false;
+      $('pbSid').textContent = sid;
+      $('liveTag').textContent = 'SESSION ACTIVE';
+      $('liveTag').classList.add('live');
+
+      setAdState('none');
+      startStatePoll();
+    }
+
+    function toggleManualEntry() {
+      const el = $('manualEntry');
+      el.style.display = el.style.display === 'none' ? '' : 'none';
+    }
+
+    function loadManualSession() {
+      const sid = $('manualSid').value.trim();
+      if (!sid) { log('Paste a session ID first.', 'warn'); return; }
+      const base = window.location.origin;
+      applySession(sid, `${base}/session/${sid}/master.m3u8`);
+      log(`Loaded existing session ${sid}`, 'ok');
+    }
+
+    /* ── Ad break trigger ──────────────────────────────── */
+    async function triggerAdBreak() {
+      if (!sessionId) { log('No active session.', 'warn'); return; }
+      const duration = parseInt($('adDuration').value, 10);
+      if (isNaN(duration) || duration < 1 || duration > 120) {
+        log('Duration must be 1–120 seconds.', 'err'); return;
+      }
+
+      $('triggerBtn').disabled = true;
+      log(`Triggering ad break: ~${duration}s from now…`, 'warn');
+      try {
+        const url = `/session/${sessionId}/trigger-ad-break?duration=${duration}`;
+        const resp = await fetch(url, { method: 'POST' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        log(`Ad break scheduled (${duration}s). Stitcher will inject at next segment boundary.`, 'ok');
+        setAdState('pending');
+      } catch (err) {
+        log(`Trigger failed: ${err.message}`, 'err');
+        $('triggerBtn').disabled = false;
+      }
+      // Re-enable after 10s safety window
+      setTimeout(() => { $('triggerBtn').disabled = false; }, 10000);
+    }
+
+    /* ── State polling ─────────────────────────────────── */
+    function startStatePoll() {
+      if (statePollTimer) clearInterval(statePollTimer);
+      statePollTimer = setInterval(pollState, 3000);
+    }
+
+    async function pollState() {
+      if (!sessionId) return;
+      try {
+        // Poll manifest to detect state change via response headers; use ad state from UI flow
+        // Lightweight: just ping the health endpoint to confirm server is up
+        const r = await fetch('/health');
+        if (r.ok) {
+          $('liveTag').textContent = 'SESSION ACTIVE';
+          $('liveTag').classList.add('live');
+        }
+      } catch (_) {
+        $('liveTag').textContent = 'OFFLINE';
+        $('liveTag').classList.remove('live');
+      }
+    }
+
+    /* ── Player ────────────────────────────────────────── */
+    function initPlayer() {
+      if (player) return player;
+      $('ssaiPlayer').style.display = '';
+      $('placeholder').style.display = 'none';
+      player = videojs('ssaiPlayer', {
+        fluid: false,
+        html5: { vhs: { overrideNative: true, enableLowInitialPlaylist: true } },
+      });
+      $('pbBar').style.display = '';
+
+      player.on('playing', () => { $('pbState').textContent = 'Playing'; setAdState('active'); });
+      player.on('waiting', () => $('pbState').textContent = 'Buffering…');
+      player.on('pause',   () => $('pbState').textContent = 'Paused');
+      player.on('ended',   () => $('pbState').textContent = 'Ended');
+
+      player.on('timeupdate', () => {
+        const b = player.buffered();
+        if (b && b.length) {
+          const ahead = (b.end(b.length - 1) - player.currentTime()).toFixed(1);
+          $('pbBuffered').textContent = `${ahead}s ahead`;
+        }
+      });
+
+      player.on('loadedmetadata', () => {
+        const vt = player.videoTracks && player.videoTracks();
+        if (vt && vt.length) {
+          const t = vt[vt.length - 1];
+          if (t && t.width) $('pbRes').textContent = `${t.width}×${t.height}`;
+        }
+        log('Stream metadata loaded.', 'ok');
+      });
+
+      player.on('error', () => {
+        const err = player.error();
+        log(`Player error: ${err ? err.message : 'unknown'}`, 'err');
+        $('pbState').textContent = 'Error';
+      });
+
+      return player;
+    }
+
+    function loadStream(url) {
+      const p = initPlayer();
+      p.src({ src: url, type: 'application/x-mpegURL' });
+      p.ready(() => p.play().catch(() => log('Autoplay blocked — press Play.', 'warn')));
+      log(`Loading: ${url}`, 'dim');
+    }
+
+    function loadSessionStream() {
+      if (!masterUrl) { log('No session active.', 'warn'); return; }
+      loadStream(masterUrl);
+    }
+
+    function loadManualUrl() {
+      const url = $('manualUrl').value.trim();
+      if (!url) { log('Enter a URL first.', 'warn'); return; }
+      loadStream(url);
+    }
+
+    /* ── Restore last session from localStorage ────────── */
+    (() => {
+      const saved = localStorage.getItem('ssai-last-sid');
+      if (saved) {
+        $('manualSid').value = saved;
+        log(`Last session ID restored: ${saved.slice(0,8)}… (click Load Existing if you want to resume)`, 'dim');
+      }
+    })();
+
+    // Persist session ID when created
+    const _origApply = applySession;
+    window.applySession = function(sid, url) {
+      localStorage.setItem('ssai-last-sid', sid);
+      _origApply(sid, url);
+    };
+  </script>
+</body>
+</html>

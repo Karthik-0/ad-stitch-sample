@@ -1,0 +1,8 @@
+services:
+  ossrs:
+    image: ossrs/srs:5
+    ports:
+      - "1935:1935"
+      - "1985:1985"
+      - "8085:8080"
+    command: ./objs/srs -c conf/srs.conf
