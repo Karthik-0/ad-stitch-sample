@@ -1,6 +1,8 @@
 import unittest
 
-from routes.control import _calculate_splice_sequence
+from fastapi import HTTPException
+
+from routes.control import _calculate_splice_sequence, _normalize_ad_tag
 
 
 class ControlSchedulingTestCase(unittest.TestCase):
@@ -25,6 +27,20 @@ class ControlSchedulingTestCase(unittest.TestCase):
             ),
             505,
         )
+
+    def test_normalize_ad_tag_accepts_https(self) -> None:
+        self.assertEqual(
+            _normalize_ad_tag(" https://example.com/vast.xml "),
+            "https://example.com/vast.xml",
+        )
+
+    def test_normalize_ad_tag_empty_is_none(self) -> None:
+        self.assertIsNone(_normalize_ad_tag("   "))
+        self.assertIsNone(_normalize_ad_tag(None))
+
+    def test_normalize_ad_tag_rejects_non_http(self) -> None:
+        with self.assertRaises(HTTPException):
+            _normalize_ad_tag("ftp://example.com/adtag")
 
 
 if __name__ == "__main__":

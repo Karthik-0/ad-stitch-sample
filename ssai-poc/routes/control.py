@@ -13,7 +13,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from config import LIVE_DIR, RENDITIONS, SEGMENT_DURATION
+from config import ACTIVE_VAST_TAG, LIVE_DIR, RENDITIONS, SEGMENT_DURATION
 from manifest_builder import get_next_media_sequence
 from session_manager import session_manager
 from models import AdState
@@ -34,6 +34,17 @@ def _calculate_splice_sequence(
     return base_sequence + segment_offset
 
 
+def _normalize_ad_tag(ad_tag: Optional[str]) -> Optional[str]:
+    if ad_tag is None:
+        return None
+    normalized = ad_tag.strip()
+    if not normalized:
+        return None
+    if not (normalized.startswith("http://") or normalized.startswith("https://")):
+        raise HTTPException(status_code=400, detail="ad_tag must be a valid http/https URL")
+    return normalized
+
+
 class TriggerAdBreakRequest(BaseModel):
     duration: int  # seconds
 
@@ -42,6 +53,7 @@ class TriggerAdBreakRequest(BaseModel):
 async def trigger_ad_break(
     sid: str,
     duration: int = Query(..., ge=1, le=120, description="Ad break duration in seconds"),
+    ad_tag: Optional[str] = Query(None, description="Optional ad tag URL override for this break"),
 ):
     """
     Task 5.2: Manually trigger an ad break insertion with duration parameter.
@@ -89,18 +101,25 @@ async def trigger_ad_break(
         fallback_next_sequence=next_media_sequence,
         duration_seconds=duration,
     )
+    selected_ad_tag = _normalize_ad_tag(ad_tag)
 
     # Task 5.4: Mark session as pending and anchor it at the next live media sequence.
     session.ad_state = AdState.PENDING
     session.splice_at_sequence = splice_at_sequence
+    session.pending_ad_tag = selected_ad_tag
     logger.info(
         f"Mid-roll trigger set PENDING for session {sid}, duration={duration}s, "
-        f"last_live_sequence={session.last_live_sequence}, splice_at={splice_at_sequence}"
+        f"last_live_sequence={session.last_live_sequence}, splice_at={splice_at_sequence}, "
+        f"ad_tag={'default' if selected_ad_tag is None else selected_ad_tag}"
     )
 
     # Return 202 Accepted immediately
     from fastapi.responses import JSONResponse
     return JSONResponse(
         status_code=202,
-        content={"status": "accepted", "message": "Mid-roll trigger scheduled"},
+        content={
+            "status": "accepted",
+            "message": "Mid-roll trigger scheduled",
+            "ad_tag": selected_ad_tag or ACTIVE_VAST_TAG,
+        },
     )

@@ -327,6 +327,19 @@
         <div class="panel-title">Ad Insertion</div>
 
         <div style="margin-bottom:12px">
+          <label class="form-label" for="adTagPreset">Ad Tag Preset</label>
+          <select id="adTagPreset" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font-size:0.88rem;outline:none;">
+            <option value="">Default (current server tag)</option>
+            <option value="https://pubads.g.doubleclick.net/gampad/ads?iu=/21775744923/external/single_ad_samples&sz=640x480&cust_params=sample_ct%3Dlinear&ciu_szs=300x250%2C728x90&gdfp_req=1&output=vast&unviewed_position_start=1&env=vp&impl=s&correlator=">Google Sample: Single Linear</option>
+            <option value="https://pubads.g.doubleclick.net/gampad/ads?iu=/21775744923/external/vmap_ad_samples&sz=640x480&cust_params=sample_ar%3Dpremidpostpod&ciu_szs=300x250%2C728x90&gdfp_req=1&ad_rule=1&output=vmap&unviewed_position_start=1&env=vp&impl=s&cmsid=496&vid=short_onecue&correlator=">Google Sample: VMAP Pod</option>
+            <option value="__custom__">Custom URL...</option>
+          </select>
+          <div id="customAdTagWrap" style="display:none;margin-top:8px;">
+            <input type="url" id="customAdTag" placeholder="https://..." autocomplete="off">
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px">
           <label class="form-label" for="adDuration">Insert ad in <strong id="durationLabel">30</strong> seconds</label>
           <input type="range" id="adDurationSlider" min="6" max="120" step="6" value="30"
             style="width:100%;accent-color:var(--orange);cursor:pointer;margin-bottom:6px"
@@ -563,6 +576,11 @@
 
     $('adDuration').addEventListener('input', syncDuration);
 
+    $('adTagPreset').addEventListener('change', () => {
+      const useCustom = $('adTagPreset').value === '__custom__';
+      $('customAdTagWrap').style.display = useCustom ? '' : 'none';
+    });
+
     /* ── Session creation ──────────────────────────────── */
     async function createSession() {
       const contentId = $('contentIdInput').value.trim() || 'demo';
@@ -636,13 +654,30 @@
         log('Duration must be 1–120 seconds.', 'err'); return;
       }
 
+      const selectedPreset = $('adTagPreset').value;
+      let selectedAdTag = '';
+      if (selectedPreset === '__custom__') {
+        selectedAdTag = $('customAdTag').value.trim();
+        if (!selectedAdTag) {
+          log('Enter a custom ad tag URL or choose a preset.', 'err');
+          return;
+        }
+      } else if (selectedPreset) {
+        selectedAdTag = selectedPreset;
+      }
+
       $('triggerBtn').disabled = true;
-      log(`Triggering ad break: ~${duration}s from now…`, 'warn');
+      log(`Triggering ad break: ~${duration}s from now (${selectedAdTag ? 'selected tag' : 'default tag'})…`, 'warn');
       try {
-        const url = `/session/${sessionId}/trigger-ad-break?duration=${duration}`;
+        const params = new URLSearchParams({ duration: String(duration) });
+        if (selectedAdTag) {
+          params.set('ad_tag', selectedAdTag);
+        }
+        const url = `/session/${sessionId}/trigger-ad-break?${params.toString()}`;
         const resp = await fetch(url, { method: 'POST' });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        log(`Ad break scheduled (${duration}s). Stitcher will inject at next segment boundary.`, 'ok');
+        const result = await resp.json();
+        log(`Ad break scheduled (${duration}s). Tag: ${result.ad_tag || 'default'}`, 'ok');
         setAdState('pending');
       } catch (err) {
         log(`Trigger failed: ${err.message}`, 'err');

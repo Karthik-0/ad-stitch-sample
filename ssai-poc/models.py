@@ -60,6 +60,7 @@ class Session:
     active_pod: Optional[AdPod] = None
     pod_history: list[str] = field(default_factory=list)
     splice_at_sequence: Optional[int] = None
+    pending_ad_tag: Optional[str] = None
     last_live_sequence: Optional[int] = None
     pod_progress_lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # Task 2.4: concurrency coordination
     processed_scte35_cue_ids: list[str] = field(default_factory=list)  # SCTE-35: Track seen cues to prevent re-trigger

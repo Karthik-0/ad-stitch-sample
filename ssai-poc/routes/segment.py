@@ -136,6 +136,7 @@ async def serve_ad_segment(
             if active_pod.pod_id not in session.pod_history:
                 session.pod_history.append(active_pod.pod_id)
             session.ad_state = AdState.COMPLETED
+            session.pending_ad_tag = None
             if active_pod.pod_id.startswith(f"midroll-{sid}-"):
                 session.splice_at_sequence = None
         
@@ -296,10 +297,30 @@ async def serve_variant_manifest(
     # Mid-roll queue handling: if trigger set PENDING, condition the ad inline here.
     from models import AdState
     if session.ad_state == AdState.PENDING and not session.pending_pod:
+        selected_ad_tag = session.pending_ad_tag
         # Prefer reusing an already-conditioned creative (from pre-roll cache) to
         # avoid an unnecessary VAST round-trip during mid-roll insertion.
         source_pod = session.active_pod
-        if source_pod:
+        if selected_ad_tag:
+            try:
+                parsed_ads = await asyncio.wait_for(
+                    fetch_vast(selected_ad_tag),
+                    timeout=5.0,
+                )
+                if parsed_ads:
+                    conditioned_ad = await condition_ad(parsed_ads[0])
+                    from models import AdPod
+                    session.pending_pod = AdPod(
+                        pod_id=f"midroll-{sid}-{session.splice_at_sequence}",
+                        ads=[conditioned_ad],
+                        total_duration=conditioned_ad.duration_sec,
+                    )
+                    logger.info(f"✓ Mid-roll pod conditioned from selected ad tag for session {sid}")
+            except Exception as e:
+                logger.warning(f"✗ Mid-roll conditioning failed for session {sid}: {e}")
+                session.ad_state = AdState.NONE
+                session.pending_ad_tag = None
+        elif source_pod:
             from models import AdPod
             session.pending_pod = AdPod(
                 pod_id=f"midroll-{sid}-{session.splice_at_sequence}",
@@ -326,6 +347,7 @@ async def serve_variant_manifest(
             except Exception as e:
                 logger.warning(f"✗ Mid-roll conditioning failed for session {sid}: {e}")
                 session.ad_state = AdState.NONE
+                session.pending_ad_tag = None
 
     current_last_sequence = get_last_media_sequence(live_variant)
     session.last_live_sequence = current_last_sequence
@@ -348,6 +370,7 @@ async def serve_variant_manifest(
             session.active_pod = session.pending_pod
             session.pending_pod = None
             session.ad_state = AdState.ACTIVE
+            session.pending_ad_tag = None
         from fastapi.responses import Response
         return Response(content=rewritten, media_type="application/vnd.apple.mpegurl")
 
