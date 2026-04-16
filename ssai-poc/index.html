@@ -225,6 +225,32 @@
     .pb-item { display: flex; gap: 5px; }
     .pb-item strong { color: var(--text); }
 
+    .seek-wrap {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: var(--surface);
+      display: none;
+    }
+    .seek-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .seek-head strong {
+      color: var(--text);
+      font-family: monospace;
+      font-size: 0.8rem;
+    }
+    #seekSlider {
+      width: 100%;
+      accent-color: var(--blue);
+      cursor: pointer;
+    }
+
     /* Quick tips */
     .tip { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
     .tip code {
@@ -364,6 +390,14 @@
         <div class="pb-item">Session: <strong id="pbSid" style="font-size:0.75rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</strong></div>
       </div>
 
+      <div class="seek-wrap" id="seekWrap">
+        <div class="seek-head">
+          <span>Rewind / Seek</span>
+          <strong id="seekTime">--:-- / --:--</strong>
+        </div>
+        <input id="seekSlider" type="range" min="0" max="100" value="100" step="0.1">
+      </div>
+
       <!-- Quick tips panel -->
       <div class="panel tip">
         <div class="panel-title">How It Works</div>
@@ -389,6 +423,8 @@
     let masterUrl = null;
     let player = null;
     let statePollTimer = null;
+    let seekUiTimer = null;
+    let isSeeking = false;
 
     /* ── Helpers ───────────────────────────────────────── */
     const $ = id => document.getElementById(id);
@@ -405,6 +441,111 @@
 
     function copyText(text) {
       navigator.clipboard.writeText(text).then(() => log('Copied to clipboard.', 'dim'));
+    }
+
+    function fmtTime(seconds) {
+      if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
+      const s = Math.floor(seconds);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      if (h > 0) {
+        return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+      }
+      return `${m}:${String(sec).padStart(2, '0')}`;
+    }
+
+    function getCurrentTimeValue() {
+      if (!player) return NaN;
+      if (player.kind === 'native') return player.el.currentTime;
+      return player.currentTime();
+    }
+
+    function setCurrentTimeValue(timeValue) {
+      if (!player || !Number.isFinite(timeValue)) return;
+      if (player.kind === 'native') {
+        player.el.currentTime = timeValue;
+      } else {
+        player.currentTime(timeValue);
+      }
+    }
+
+    function getSeekWindow() {
+      if (!player) return null;
+
+      let seekable = null;
+      let current = getCurrentTimeValue();
+
+      if (player.kind === 'native') {
+        seekable = player.el.seekable;
+      } else if (typeof player.seekable === 'function') {
+        seekable = player.seekable();
+      }
+
+      if (seekable && seekable.length > 0) {
+        const start = seekable.start(0);
+        const end = seekable.end(seekable.length - 1);
+        return { start, end, current };
+      }
+
+      let duration = NaN;
+      if (player.kind === 'native') {
+        duration = player.el.duration;
+      } else if (typeof player.duration === 'function') {
+        duration = player.duration();
+      }
+
+      if (Number.isFinite(duration) && duration > 0) {
+        return { start: 0, end: duration, current };
+      }
+      return null;
+    }
+
+    function refreshSeekUi() {
+      const wrap = $('seekWrap');
+      const slider = $('seekSlider');
+      const label = $('seekTime');
+
+      const win = getSeekWindow();
+      if (!win) {
+        wrap.style.display = 'none';
+        return;
+      }
+
+      wrap.style.display = '';
+      const clampedCurrent = Math.min(Math.max(win.current, win.start), win.end);
+      label.textContent = `${fmtTime(clampedCurrent - win.start)} / ${fmtTime(win.end - win.start)}`;
+
+      slider.min = String(win.start);
+      slider.max = String(win.end);
+      if (!isSeeking) {
+        slider.value = String(clampedCurrent);
+      }
+    }
+
+    function bindSeekUi() {
+      const slider = $('seekSlider');
+      slider.oninput = () => {
+        isSeeking = true;
+        const win = getSeekWindow();
+        if (!win) return;
+        const target = Number(slider.value);
+        $('seekTime').textContent = `${fmtTime(target - win.start)} / ${fmtTime(win.end - win.start)}`;
+      };
+
+      slider.onchange = () => {
+        const target = Number(slider.value);
+        setCurrentTimeValue(target);
+        isSeeking = false;
+        refreshSeekUi();
+      };
+
+      slider.onmouseup = () => {
+        isSeeking = false;
+      };
+      slider.ontouchend = () => {
+        isSeeking = false;
+      };
     }
 
     function setAdState(state) {
@@ -569,6 +710,10 @@
           $('pbState').textContent = 'Error';
           log('Native player failed to load HLS. In Chrome/Edge, allow Video.js CDN or use Safari native HLS.', 'err');
         });
+
+        native.addEventListener('timeupdate', refreshSeekUi);
+        native.addEventListener('loadedmetadata', refreshSeekUi);
+        native.addEventListener('progress', refreshSeekUi);
         return player;
       }
 
@@ -589,6 +734,7 @@
           const ahead = (b.end(b.length - 1) - player.currentTime()).toFixed(1);
           $('pbBuffered').textContent = `${ahead}s ahead`;
         }
+        refreshSeekUi();
       });
 
       player.on('loadedmetadata', () => {
@@ -598,6 +744,7 @@
           if (t && t.width) $('pbRes').textContent = `${t.width}×${t.height}`;
         }
         log('Stream metadata loaded.', 'ok');
+        refreshSeekUi();
       });
 
       player.on('error', () => {
@@ -618,6 +765,12 @@
           playResult.catch(() => log('Autoplay blocked — press Play.', 'warn'));
         }
       });
+
+      if (seekUiTimer) {
+        clearInterval(seekUiTimer);
+      }
+      seekUiTimer = setInterval(refreshSeekUi, 500);
+
       log(`Loading: ${url}`, 'dim');
     }
 
@@ -634,6 +787,8 @@
 
     /* ── Restore last session from localStorage ────────── */
     (() => {
+      bindSeekUi();
+
       const saved = localStorage.getItem('ssai-last-sid');
       if (saved) {
         $('manualSid').value = saved;
