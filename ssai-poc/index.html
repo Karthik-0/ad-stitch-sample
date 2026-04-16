@@ -371,13 +371,13 @@
         </div>
 
         <div style="margin-bottom:12px">
-          <label class="form-label" for="adDuration">Insert ad in <strong id="durationLabel">30</strong> seconds</label>
-          <input type="range" id="adDurationSlider" min="6" max="120" step="6" value="30"
+          <label class="form-label" for="adDuration">Insert ad in <strong id="durationLabel">10</strong> seconds</label>
+          <input type="range" id="adDurationSlider" min="6" max="120" step="6" value="12"
             style="width:100%;accent-color:var(--orange);cursor:pointer;margin-bottom:6px"
             oninput="document.getElementById('durationLabel').textContent=this.value; document.getElementById('adDuration').value=this.value">
           <div class="form-row">
             <span class="form-label" style="margin:0;white-space:nowrap">Exact seconds:</span>
-            <input type="number" id="adDuration" value="30" min="1" max="120"
+            <input type="number" id="adDuration" value="10" min="1" max="120"
               oninput="document.getElementById('adDurationSlider').value=this.value; document.getElementById('durationLabel').textContent=this.value">
           </div>
         </div>
@@ -387,7 +387,7 @@
         </button>
 
         <div style="margin-top:8px;font-size:0.75rem;color:var(--muted);line-height:1.5">
-          Ad will appear approximately <span id="durationSummary">30</span>s after current playback position.
+          Ad will appear approximately <span id="durationSummary">10</span>s after current playback position.
           Actual insertion is segment-aligned (rounded up to next 6s boundary).
         </div>
       </div>
