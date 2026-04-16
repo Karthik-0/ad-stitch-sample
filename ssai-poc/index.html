@@ -441,7 +441,11 @@
         applySession(data.session_id, effectiveMasterUrl);
         log(`Session created: ${data.session_id}`, 'ok');
         log(`Master URL: ${effectiveMasterUrl}`, 'dim');
-        loadSessionStream();
+        try {
+          loadSessionStream();
+        } catch (playerErr) {
+          log(`Session is ready, but player init failed: ${playerErr.message}`, 'err');
+        }
       } catch (err) {
         log(`Failed to create session: ${err.message}`, 'err');
       } finally {
@@ -534,6 +538,40 @@
       if (player) return player;
       $('ssaiPlayer').style.display = '';
       $('placeholder').style.display = 'none';
+
+      // Some production environments block external CDN assets.
+      // If Video.js is unavailable, fall back to native video element.
+      if (typeof window.videojs !== 'function') {
+        const native = $('ssaiPlayer');
+        player = {
+          kind: 'native',
+          el: native,
+          src(payload) {
+            native.src = payload.src;
+          },
+          ready(cb) {
+            cb();
+          },
+          play() {
+            return native.play();
+          },
+        };
+        $('pbBar').style.display = '';
+        $('pbState').textContent = 'Native Player';
+        log('Video.js not available (CDN blocked?). Using native video fallback.', 'warn');
+
+        native.addEventListener('playing', () => { $('pbState').textContent = 'Playing'; setAdState('active'); });
+        native.addEventListener('waiting', () => { $('pbState').textContent = 'Buffering…'; });
+        native.addEventListener('pause',   () => { $('pbState').textContent = 'Paused'; });
+        native.addEventListener('ended',   () => { $('pbState').textContent = 'Ended'; });
+        native.addEventListener('loadedmetadata', () => { log('Stream metadata loaded.', 'ok'); });
+        native.addEventListener('error', () => {
+          $('pbState').textContent = 'Error';
+          log('Native player failed to load HLS. In Chrome/Edge, allow Video.js CDN or use Safari native HLS.', 'err');
+        });
+        return player;
+      }
+
       player = videojs('ssaiPlayer', {
         fluid: false,
         html5: { vhs: { overrideNative: true, enableLowInitialPlaylist: true } },
@@ -574,7 +612,12 @@
     function loadStream(url) {
       const p = initPlayer();
       p.src({ src: url, type: 'application/x-mpegURL' });
-      p.ready(() => p.play().catch(() => log('Autoplay blocked — press Play.', 'warn')));
+      p.ready(() => {
+        const playResult = p.play();
+        if (playResult && typeof playResult.catch === 'function') {
+          playResult.catch(() => log('Autoplay blocked — press Play.', 'warn'));
+        }
+      });
       log(`Loading: ${url}`, 'dim');
     }
 
@@ -595,6 +638,10 @@
       if (saved) {
         $('manualSid').value = saved;
         log(`Last session ID restored: ${saved.slice(0,8)}… (click Load Existing if you want to resume)`, 'dim');
+      }
+
+      if (typeof window.videojs !== 'function') {
+        log('Video.js script not loaded. Playback will use native fallback.', 'warn');
       }
     })();
 
