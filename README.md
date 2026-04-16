@@ -4,6 +4,7 @@ Top-level workspace for the SSAI proof of concept and OpenSpec change artifacts.
 
 ## Main Documentation
 
+- Project walkthrough: [HOW_IT_WORKS.md](HOW_IT_WORKS.md)
 - SSAI operational guide: [ssai-poc/README.md](ssai-poc/README.md)
 - Technical specification: [TechSpecs.md](TechSpecs.md)
 - OpenSpec changes: [openspec/changes](openspec/changes)

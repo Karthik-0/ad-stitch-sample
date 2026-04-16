@@ -212,6 +212,18 @@
     }
     .player-placeholder .icon { font-size: 2.5rem; opacity: 0.3; }
     .video-js { width: 100%!important; height: 100%!important; }
+    .video-js.vjs-live .vjs-progress-control,
+    .video-js.vjs-liveui .vjs-progress-control {
+      display: flex !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      min-width: 120px;
+      flex: 1 1 auto;
+    }
+    .video-js .vjs-control-bar {
+      display: flex !important;
+    }
 
     /* Playback info bar */
     .pb-bar {
@@ -754,9 +766,27 @@
 
       player = videojs('ssaiPlayer', {
         fluid: false,
-        html5: { vhs: { overrideNative: true, enableLowInitialPlaylist: true } },
+        liveui: true,
+        controlBar: {
+          progressControl: true,
+          liveDisplay: true,
+          currentTimeDisplay: true,
+          timeDivider: true,
+          durationDisplay: true,
+          remainingTimeDisplay: false,
+        },
+        html5: {
+          vhs: {
+            // Keep VHS active so live DVR seekbar behavior stays consistent.
+            overrideNative: true,
+            enableLowInitialPlaylist: true,
+          },
+        },
       });
       $('pbBar').style.display = '';
+      player.ready(() => {
+        log('Video.js initialized with live UI and progress control enabled.', 'dim');
+      });
 
       player.on('playing', () => { $('pbState').textContent = 'Playing'; setAdState('active'); });
       player.on('waiting', () => $('pbState').textContent = 'Buffering…');
