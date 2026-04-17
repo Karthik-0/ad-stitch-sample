@@ -56,6 +56,7 @@ def expand_ad_tag_macros(url: str) -> str:
         url.replace("[timestamp]", timestamp)
         .replace("[referrer_url]", PUBLIC_BASE_URL)
         .replace("[description_url]", PUBLIC_BASE_URL)
+        .replace("[placeholder]", PUBLIC_BASE_URL)
     )
 
 
@@ -105,23 +106,32 @@ def _text(node: ET.Element | None) -> str:
 
 
 def _select_media_file(linear: ET.Element) -> str:
-    candidates: list[tuple[int, str]] = []
+    mp4_candidates: list[tuple[int, str]] = []
+    hls_candidates: list[tuple[int, str]] = []
     for media in _all_by_name(linear, "MediaFile"):
         delivery = media.attrib.get("delivery", "").lower()
         media_type = media.attrib.get("type", "").lower()
-        if delivery != "progressive" or media_type != "video/mp4":
-            continue
         url = _text(media)
         if not url:
             continue
         bitrate = int(media.attrib.get("bitrate", "0") or "0")
-        candidates.append((bitrate, url))
 
-    if not candidates:
-        raise VastParseError("no compatible progressive mp4 media file found")
+        if delivery == "progressive" and media_type == "video/mp4":
+            mp4_candidates.append((bitrate, url))
+            continue
 
-    candidates.sort(key=lambda item: item[0], reverse=True)
-    return candidates[0][1]
+        if media_type in {"application/vnd.apple.mpegurl", "application/x-mpegurl"}:
+            hls_candidates.append((bitrate, url))
+
+    if mp4_candidates:
+        mp4_candidates.sort(key=lambda item: item[0], reverse=True)
+        return mp4_candidates[0][1]
+
+    if hls_candidates:
+        hls_candidates.sort(key=lambda item: item[0], reverse=True)
+        return hls_candidates[0][1]
+
+    raise VastParseError("no compatible media file (mp4 or hls) found")
 
 
 def _parse_inline_ad(ad_node: ET.Element, inline_node: ET.Element, index: int) -> ParsedAd:

@@ -334,8 +334,17 @@ async def serve_variant_manifest(
                     logger.info(f"✓ Mid-roll pod conditioned from selected ad tag for session {sid}")
             except Exception as e:
                 logger.warning(f"✗ Mid-roll conditioning failed for session {sid}: {e}")
-                session.ad_state = AdState.NONE
-                session.pending_ad_tag = None
+                if source_pod:
+                    from models import AdPod
+                    session.pending_pod = AdPod(
+                        pod_id=f"midroll-{sid}-{session.splice_at_sequence}",
+                        ads=source_pod.ads,
+                        total_duration=source_pod.total_duration,
+                    )
+                    logger.info(f"↺ Mid-roll fallback: reused cached pod for session {sid}")
+                else:
+                    session.ad_state = AdState.NONE
+                    session.pending_ad_tag = None
         elif source_pod:
             from models import AdPod
             session.pending_pod = AdPod(

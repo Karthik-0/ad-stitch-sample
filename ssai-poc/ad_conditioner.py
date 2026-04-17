@@ -4,6 +4,7 @@ import asyncio
 import shutil
 import tempfile
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -16,7 +17,7 @@ class AdConditionerError(Exception):
     pass
 
 
-def build_ffmpeg_command(input_path: Path, creative_dir: Path, rendition: dict[str, int | str]) -> list[str]:
+def build_ffmpeg_command(input_source: str, creative_dir: Path, rendition: dict[str, int | str]) -> list[str]:
     rendition_name = str(rendition["name"])
     width = int(rendition["width"])
     height = int(rendition["height"])
@@ -30,7 +31,7 @@ def build_ffmpeg_command(input_path: Path, creative_dir: Path, rendition: dict[s
         "ffmpeg",
         "-y",
         "-i",
-        str(input_path),
+        input_source,
         "-vf",
         f"scale={width}:{height}",
         "-c:v",
@@ -138,9 +139,9 @@ async def _run_ffmpeg(command: list[str]) -> None:
         raise AdConditionerError(f"ffmpeg failed with code {process.returncode}: {stderr.decode('utf-8', errors='replace')}")
 
 
-async def _transcode_rendition(input_path: Path, creative_dir: Path, rendition: dict[str, int | str]) -> tuple[str, list[tuple[str, float]]]:
+async def _transcode_rendition(input_source: str, creative_dir: Path, rendition: dict[str, int | str]) -> tuple[str, list[tuple[str, float]]]:
     rendition_name = str(rendition["name"])
-    command = build_ffmpeg_command(input_path=input_path, creative_dir=creative_dir, rendition=rendition)
+    command = build_ffmpeg_command(input_source=input_source, creative_dir=creative_dir, rendition=rendition)
     await _run_ffmpeg(command)
     playlist_path = creative_dir / f"{rendition_name}.m3u8"
     return rendition_name, parse_hls_playlist(playlist_path)
@@ -171,13 +172,20 @@ async def condition_ad(parsed_ad: ParsedAd) -> ConditionedAd:
         return _build_conditioned_ad(parsed_ad, cached_renditions)
 
     temp_media_path = Path(tempfile.gettempdir()) / f"{parsed_ad.creative_id}.mp4"
+    temp_downloaded = False
     done_marker = creative_dir / ".done"
 
-    await _download_media(parsed_ad.media_url, temp_media_path)
+    media_path = urlsplit(parsed_ad.media_url).path.lower()
+    if media_path.endswith(".m3u8"):
+        input_source = parsed_ad.media_url
+    else:
+        await _download_media(parsed_ad.media_url, temp_media_path)
+        temp_downloaded = True
+        input_source = str(temp_media_path)
 
     try:
         results = await asyncio.gather(
-            *[_transcode_rendition(temp_media_path, creative_dir, rendition) for rendition in RENDITIONS]
+            *[_transcode_rendition(input_source, creative_dir, rendition) for rendition in RENDITIONS]
         )
         rendition_map = {rendition_name: segments for rendition_name, segments in results}
         done_marker.write_text("ok\n", encoding="utf-8")
@@ -187,7 +195,7 @@ async def condition_ad(parsed_ad: ParsedAd) -> ConditionedAd:
             done_marker.unlink()
         raise AdConditionerError(f"conditioning failed for creative {parsed_ad.creative_id}") from exc
     finally:
-        if temp_media_path.exists():
+        if temp_downloaded and temp_media_path.exists():
             temp_media_path.unlink()
 
 

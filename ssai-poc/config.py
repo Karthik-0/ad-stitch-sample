@@ -57,7 +57,13 @@ VAST_TAG_SANSKAR_PREROLL = (
     "&env=vp&impl=s&gdfp_req=1&output=vast&unviewed_position_start=1"
     "&url=[referrer_url]&description_url=[description_url]&correlator=[timestamp]"
 )
+VAST_TAG_SANS_VOD_TEST = (
+    "https://pubads.g.doubleclick.net/gampad/ads?"
+    "iu=/22813648612/SANS_VOD_TEST&description_url=[placeholder]&tfcd=0&npa=0"
+    "&sz=400x300%7C640x480&ciu_szs=300x250%2C320x50&gdfp_req=1"
+    "&unviewed_position_start=1&output=vast&env=vp&impl=s&correlator="
+)
 
-ACTIVE_VAST_TAG = VAST_TAG_SANSKAR_PREROLL
+ACTIVE_VAST_TAG = VAST_TAG_SANS_VOD_TEST
 SESSION_TTL_SECONDS = 3600
 CLEANUP_INTERVAL_SECONDS = 300

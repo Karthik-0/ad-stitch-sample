@@ -55,6 +55,31 @@ class VastClientParseTestCase(unittest.TestCase):
         self.assertEqual(ad.tracking_events[0].event, "start")
         self.assertRegex(ad.tracking_events[0].url, r"cb=\d{8}$")
 
+        def test_inline_vast_parsing_accepts_hls_mediafile_when_mp4_missing(self) -> None:
+                xml = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<VAST version=\"3.0\">
+    <Ad id=\"ad-hls\">
+        <InLine>
+            <Creatives>
+                <Creative id=\"creative-hls-1\">
+                    <Linear>
+                        <Duration>00:00:10</Duration>
+                        <MediaFiles>
+                            <MediaFile delivery=\"streaming\" type=\"application/vnd.apple.mpegurl\" bitrate=\"800\">https://cdn.example.com/ad/master.m3u8</MediaFile>
+                        </MediaFiles>
+                    </Linear>
+                </Creative>
+            </Creatives>
+            <Impression>https://tracker.example.com/imp</Impression>
+        </InLine>
+    </Ad>
+</VAST>
+"""
+                ads, wrapper = vast_client.parse_vast_xml(xml)
+                self.assertIsNone(wrapper)
+                self.assertEqual(len(ads), 1)
+                self.assertEqual(ads[0].media_url, "https://cdn.example.com/ad/master.m3u8")
+
     def test_vmap_parser_extracts_valid_breaks_only(self) -> None:
         breaks = vast_client.parse_vmap_xml(_load_fixture("vmap_sample.xml"))
         self.assertEqual(len(breaks), 2)
