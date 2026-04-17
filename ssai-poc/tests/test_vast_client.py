@@ -24,6 +24,24 @@ class VastClientParseTestCase(unittest.TestCase):
         self.assertIn("foo=bar", url)
         self.assertIn("correlator=12345", url)
 
+    @patch("vast_client.time.time", return_value=1713333333.123)
+    def test_expand_ad_tag_macros_replaces_supported_placeholders(self, _: object) -> None:
+        expanded = vast_client.expand_ad_tag_macros(
+            "https://ads.example.com/tag?url=[referrer_url]&description_url=[description_url]&correlator=[timestamp]"
+        )
+        self.assertIn("url=http://localhost:8080", expanded)
+        self.assertIn("description_url=http://localhost:8080", expanded)
+        self.assertIn("correlator=1713333333123", expanded)
+
+    @patch("vast_client.time.time", return_value=1713333333.123)
+    def test_add_correlator_overrides_placeholder_correlator(self, _: object) -> None:
+        url = vast_client.add_correlator(
+            "https://ads.example.com/tag?correlator=[timestamp]&url=[referrer_url]",
+            correlator="99999",
+        )
+        self.assertIn("correlator=99999", url)
+        self.assertIn("url=http%3A%2F%2Flocalhost%3A8080", url)
+
     def test_inline_vast_parsing_selects_best_media_and_normalizes_macros(self) -> None:
         ads, wrapper = vast_client.parse_vast_xml(_load_fixture("vast_inline.xml"))
         self.assertIsNone(wrapper)

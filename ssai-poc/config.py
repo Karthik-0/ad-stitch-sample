@@ -51,7 +51,13 @@ VAST_TAG_VMAP_POD = (
     "&gdfp_req=1&ad_rule=1&output=vmap&unviewed_position_start=1&env=vp&impl=s"
     "&cmsid=496&vid=short_onecue&correlator="
 )
+VAST_TAG_SANSKAR_PREROLL = (
+    "https://pubads.g.doubleclick.net/gampad/ads?"
+    "sz=400x300&iu=/22813648612/SANSKAR&ciu_szs=480x320"
+    "&env=vp&impl=s&gdfp_req=1&output=vast&unviewed_position_start=1"
+    "&url=[referrer_url]&description_url=[description_url]&correlator=[timestamp]"
+)
 
-ACTIVE_VAST_TAG = VAST_TAG_SINGLE_LINEAR
+ACTIVE_VAST_TAG = VAST_TAG_SANSKAR_PREROLL
 SESSION_TTL_SECONDS = 3600
 CLEANUP_INTERVAL_SECONDS = 300

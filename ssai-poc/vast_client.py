@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 
 import httpx
 
+from config import PUBLIC_BASE_URL
 from models import TrackingEvent
 
 
@@ -48,7 +49,18 @@ def generate_correlator() -> str:
     return str(int(time.time() * 1000))
 
 
+def expand_ad_tag_macros(url: str) -> str:
+    """Expand a small set of common ad tag placeholders for server-side calls."""
+    timestamp = str(int(time.time() * 1000))
+    return (
+        url.replace("[timestamp]", timestamp)
+        .replace("[referrer_url]", PUBLIC_BASE_URL)
+        .replace("[description_url]", PUBLIC_BASE_URL)
+    )
+
+
 def add_correlator(url: str, correlator: str | None = None) -> str:
+    url = expand_ad_tag_macros(url)
     value = correlator or generate_correlator()
     split = urlsplit(url)
     query_items = parse_qsl(split.query, keep_blank_values=True)
