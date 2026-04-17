@@ -282,7 +282,7 @@ Response example:
 
 Notes:
 
-- The trigger schedules the ad break approximately `duration` seconds after the player's observed playback position.
+- The trigger schedules the ad break approximately `duration` seconds after the session's latest playback anchor, but it will never place the splice inside an already-published live window.
 - In practice, insertion is segment-aligned, so actual timing is rounded up by one segment.
 
 ## Testing

@@ -3,6 +3,7 @@ import unittest
 from fastapi.testclient import TestClient
 
 from main import app
+from routes.segment import _playlist_response
 
 
 class EndpointsTestCase(unittest.TestCase):
@@ -32,6 +33,15 @@ class EndpointsTestCase(unittest.TestCase):
         sid_a = response_a.json()["session_id"]
         sid_b = response_b.json()["session_id"]
         self.assertNotEqual(sid_a, sid_b)
+
+    def test_playlist_responses_disable_caching(self) -> None:
+        response = _playlist_response("#EXTM3U\n")
+        self.assertEqual(
+            response.headers["cache-control"],
+            "no-store, no-cache, must-revalidate, max-age=0",
+        )
+        self.assertEqual(response.headers["pragma"], "no-cache")
+        self.assertEqual(response.headers["expires"], "0")
 
 
 if __name__ == "__main__":

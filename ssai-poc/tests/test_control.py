@@ -6,15 +6,25 @@ from routes.control import _calculate_splice_sequence, _normalize_ad_tag
 
 
 class ControlSchedulingTestCase(unittest.TestCase):
-    def test_uses_last_live_sequence_when_available(self) -> None:
-        # 30s delay at 6s segments => +5 segments
+    def test_never_schedules_behind_current_live_edge(self) -> None:
+        # Observed playback anchor is stale, so scheduling uses the current live edge.
         self.assertEqual(
             _calculate_splice_sequence(
                 last_live_sequence=430,
                 fallback_next_sequence=500,
                 duration_seconds=30,
             ),
-            435,
+            505,
+        )
+
+    def test_uses_observed_anchor_when_it_is_newer_than_fallback(self) -> None:
+        self.assertEqual(
+            _calculate_splice_sequence(
+                last_live_sequence=430,
+                fallback_next_sequence=425,
+                duration_seconds=12,
+            ),
+            433,
         )
 
     def test_falls_back_to_next_sequence_without_playback_anchor(self) -> None:

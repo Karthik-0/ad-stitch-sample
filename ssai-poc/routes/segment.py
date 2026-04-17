@@ -19,9 +19,25 @@ from session_manager import session_manager
 
 router = APIRouter(prefix="/session", tags=["segment"])
 
+PLAYLIST_RESPONSE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
 
 # Filename validation: restricts to expected FFmpeg naming pattern
 LIVE_FILENAME_PATTERN = re.compile(r'^video-[a-z0-9]+\d+\.ts$')
+
+
+def _playlist_response(content: str):
+    from fastapi.responses import Response
+
+    return Response(
+        content=content,
+        media_type="application/vnd.apple.mpegurl",
+        headers=PLAYLIST_RESPONSE_HEADERS,
+    )
 
 
 @router.get("/{sid}/seg/live/{filename}")
@@ -203,9 +219,8 @@ async def serve_master_manifest(
     
     live_master = live_master_path.read_text()
     rewritten = build_master(live_master, sid)
-    
-    from fastapi.responses import Response
-    return Response(content=rewritten, media_type="application/vnd.apple.mpegurl")
+
+    return _playlist_response(rewritten)
 
 
 @router.get("/{sid}/{rendition}.m3u8")
@@ -226,6 +241,7 @@ async def serve_variant_manifest(
     from manifest_builder import (
         build_variant_live_only,
         build_variant_with_preroll,
+        get_next_media_sequence,
         get_last_media_sequence,
     )
     from vast_client import fetch_vast
@@ -349,14 +365,14 @@ async def serve_variant_manifest(
                 session.ad_state = AdState.NONE
                 session.pending_ad_tag = None
 
+    current_next_sequence = get_next_media_sequence(live_variant)
     current_last_sequence = get_last_media_sequence(live_variant)
     session.last_live_sequence = current_last_sequence
 
     if session.pending_pod and session.splice_at_sequence is not None:
         if current_last_sequence < session.splice_at_sequence:
             rewritten = build_variant_live_only(live_variant, sid)
-            from fastapi.responses import Response
-            return Response(content=rewritten, media_type="application/vnd.apple.mpegurl")
+            return _playlist_response(rewritten)
 
         rewritten, should_promote = build_variant_with_preroll(
             live_variant,
@@ -371,8 +387,11 @@ async def serve_variant_manifest(
             session.pending_pod = None
             session.ad_state = AdState.ACTIVE
             session.pending_ad_tag = None
-        from fastapi.responses import Response
-        return Response(content=rewritten, media_type="application/vnd.apple.mpegurl")
+            session.last_live_sequence = max(
+                session.last_live_sequence or current_last_sequence,
+                current_next_sequence - 1,
+            )
+        return _playlist_response(rewritten)
 
     # Task 3.1-3.5: Dynamic ad pod loading on first variant request
     if not session.active_pod:
@@ -446,6 +465,5 @@ async def serve_variant_manifest(
     else:
         # No active pod: return live-only variant with rewritten segment routes
         rewritten = build_variant_live_only(live_variant, sid)
-    
-    from fastapi.responses import Response
-    return Response(content=rewritten, media_type="application/vnd.apple.mpegurl")
+
+    return _playlist_response(rewritten)

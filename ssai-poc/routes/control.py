@@ -28,8 +28,18 @@ def _calculate_splice_sequence(
     fallback_next_sequence: int,
     duration_seconds: int,
 ) -> int:
-    """Schedule splice relative to observed playback sequence when available."""
-    base_sequence = last_live_sequence if last_live_sequence is not None else fallback_next_sequence
+    """Schedule the splice into a future portion of the live window.
+
+    The per-session playback anchor can lag behind the current source playlist when
+    the client or an intermediate proxy serves a stale manifest. If we schedule a
+    mid-roll into that already-published window, the stitched variant can jump
+    backwards and leave the player buffering at the live edge. Guard against that
+    by never scheduling earlier than the source playlist's current next sequence.
+    """
+    observed_next_sequence = (
+        last_live_sequence + 1 if last_live_sequence is not None else fallback_next_sequence
+    )
+    base_sequence = max(observed_next_sequence, fallback_next_sequence)
     segment_offset = max(1, math.ceil(duration_seconds / SEGMENT_DURATION))
     return base_sequence + segment_offset
 
