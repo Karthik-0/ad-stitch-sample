@@ -70,7 +70,9 @@ def build_variant_with_preroll(
         parsed,
         start_sequence=splice_at_sequence,
     )
-    ad_segments = pending_pod.ads[0].renditions.get(rendition, [])
+    ad_segments: list[tuple[str, float]] = []
+    for ad in pending_pod.ads:
+        ad_segments.extend(ad.renditions.get(rendition, []))
 
     if splice_at_sequence is None:
         media_sequence = max(0, live_media_sequence - len(ad_segments))

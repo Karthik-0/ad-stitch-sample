@@ -84,5 +84,35 @@ video-720p429.ts
         self.assertNotIn("/session/test-session-uuid/seg/live/video-720p423.ts", rewritten)
         self.assertNotIn("/session/test-session-uuid/seg/live/video-720p429.ts", rewritten)
 
+    def test_pod_with_multiple_ads_stitches_all_ad_segments(self):
+        multi_ad_pod = AdPod(
+            pod_id="pod-multi",
+            ads=[
+                ConditionedAd(
+                    creative_id="creative-a",
+                    duration_sec=6.0,
+                    renditions={"720p": [("a_0.ts", 6.0)]},
+                ),
+                ConditionedAd(
+                    creative_id="creative-b",
+                    duration_sec=4.0,
+                    renditions={"720p": [("b_0.ts", 4.0)]},
+                ),
+            ],
+            total_duration=10.0,
+        )
+
+        rewritten, _ = build_variant_with_preroll(
+            self.live_variant,
+            self.session_id,
+            multi_ad_pod,
+            "720p",
+            "unused",
+            splice_at_sequence=430,
+        )
+        self.assertIn("#EXT-X-CUE-OUT:DURATION=10.0", rewritten)
+        self.assertIn("/session/test-session-uuid/seg/ad/720p/0", rewritten)
+        self.assertIn("/session/test-session-uuid/seg/ad/720p/1", rewritten)
+
 if __name__ == "__main__":
     unittest.main()

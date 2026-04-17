@@ -30,6 +30,15 @@ PLAYLIST_RESPONSE_HEADERS = {
 LIVE_FILENAME_PATTERN = re.compile(r'^video-[a-z0-9]+\d+\.ts$')
 
 
+def _flatten_pod_segments(active_pod, rendition: str):
+    flattened = []
+    for ad in active_pod.ads:
+        segments = ad.renditions.get(rendition, [])
+        for filename, duration in segments:
+            flattened.append((ad, filename, duration))
+    return flattened
+
+
 def _playlist_response(content: str):
     from fastapi.responses import Response
 
@@ -114,16 +123,14 @@ async def serve_ad_segment(
         raise HTTPException(status_code=404, detail="No active pod for this session")
     
     active_pod = session.active_pod
-    conditioned_ad = active_pod.ads[0]
-    
-    if rendition not in conditioned_ad.renditions:
+    flattened_segments = _flatten_pod_segments(active_pod, rendition)
+    if not flattened_segments:
         raise HTTPException(status_code=404, detail="Rendition not found")
-    
-    segments = conditioned_ad.renditions[rendition]
-    if index >= len(segments):
+
+    if index >= len(flattened_segments):
         raise HTTPException(status_code=404, detail="Segment index out of range")
-    
-    filename, _ = segments[index]
+
+    conditioned_ad, filename, _ = flattened_segments[index]
     
     # Task 4.1: Increment segments_served counter
     async with session.pod_progress_lock:  # Task 4.5: Coordinate with lock
@@ -132,7 +139,7 @@ async def serve_ad_segment(
         active_pod.segments_served[rendition] += 1
         
         # Task 4.2: Calculate progress and detect quartile thresholds
-        progress = active_pod.segments_served[rendition] / len(segments)
+        progress = active_pod.segments_served[rendition] / len(flattened_segments)
         
         # Determine which quartiles to fire
         quartile_events = []
@@ -250,6 +257,12 @@ async def serve_variant_manifest(
     from config import ACTIVE_VAST_TAG
     
     logger = logging.getLogger(__name__)
+
+    async def _condition_ads(parsed_ads):
+        conditioned_ads = []
+        for parsed_ad in parsed_ads:
+            conditioned_ads.append(await condition_ad(parsed_ad))
+        return conditioned_ads
     
     try:
         session = await session_manager.get_session(sid)
@@ -291,16 +304,17 @@ async def serve_variant_manifest(
                         timeout=5.0,
                     )
                     if parsed_ads:
-                        conditioned_ad = await condition_ad(parsed_ads[0])
+                        conditioned_ads = await _condition_ads(parsed_ads)
+                        total_duration = sum(ad.duration_sec for ad in conditioned_ads)
                         from models import AdPod
                         session.pending_pod = AdPod(
                             pod_id=f"scte35-cue-{cue.cue_id}",
-                            ads=[conditioned_ad],
-                            total_duration=cue.duration_sec,
+                            ads=conditioned_ads,
+                            total_duration=total_duration,
                         )
                         logger.info(
                             f"✓ SCTE-35 auto-trigger: cue {cue.cue_id} "
-                            f"duration={cue.duration_sec}s at sequence {cue.start_sequence}"
+                            f"pod_duration={total_duration}s at sequence {cue.start_sequence}"
                         )
                 except Exception as e:
                     logger.warning(f"✗ SCTE-35 ad conditioning failed for {cue.cue_id}: {e}")
@@ -324,12 +338,13 @@ async def serve_variant_manifest(
                     timeout=5.0,
                 )
                 if parsed_ads:
-                    conditioned_ad = await condition_ad(parsed_ads[0])
+                    conditioned_ads = await _condition_ads(parsed_ads)
+                    total_duration = sum(ad.duration_sec for ad in conditioned_ads)
                     from models import AdPod
                     session.pending_pod = AdPod(
                         pod_id=f"midroll-{sid}-{session.splice_at_sequence}",
-                        ads=[conditioned_ad],
-                        total_duration=conditioned_ad.duration_sec,
+                        ads=conditioned_ads,
+                        total_duration=total_duration,
                     )
                     logger.info(f"✓ Mid-roll pod conditioned from selected ad tag for session {sid}")
             except Exception as e:
@@ -361,12 +376,13 @@ async def serve_variant_manifest(
                     timeout=5.0,
                 )
                 if parsed_ads:
-                    conditioned_ad = await condition_ad(parsed_ads[0])
+                    conditioned_ads = await _condition_ads(parsed_ads)
+                    total_duration = sum(ad.duration_sec for ad in conditioned_ads)
                     from models import AdPod
                     session.pending_pod = AdPod(
                         pod_id=f"midroll-{sid}-{session.splice_at_sequence}",
-                        ads=[conditioned_ad],
-                        total_duration=conditioned_ad.duration_sec,
+                        ads=conditioned_ads,
+                        total_duration=total_duration,
                     )
                     logger.info(f"✓ Mid-roll pod conditioned inline for session {sid}")
             except Exception as e:
@@ -417,24 +433,26 @@ async def serve_variant_manifest(
             if parsed_ads:
                 try:
                     # Task 3.3: Wire through ad conditioner pipeline
-                    conditioned_ad = await condition_ad(parsed_ads[0])
+                    conditioned_ads = await _condition_ads(parsed_ads)
+                    total_duration = sum(ad.duration_sec for ad in conditioned_ads)
                     
                     # Task 3.4: Load into active_pod
                     from models import AdPod
                     session.active_pod = AdPod(
                         pod_id=f"preroll-{sid}",
-                        ads=[conditioned_ad],
-                        total_duration=conditioned_ad.duration_sec,
+                        ads=conditioned_ads,
+                        total_duration=total_duration,
                     )
                     # Session object is stored as reference in session manager, changes persisted
                     
                     # Task 3.5: Fire impression beacon asynchronously
-                    asyncio.create_task(
-                        fire_tracking_event(
-                            url=conditioned_ad.impression_urls[0] if conditioned_ad.impression_urls else "",
-                            event_type="impression",
+                    for conditioned_ad in conditioned_ads:
+                        asyncio.create_task(
+                            fire_tracking_event(
+                                url=conditioned_ad.impression_urls[0] if conditioned_ad.impression_urls else "",
+                                event_type="impression",
+                            )
                         )
-                    )
                     
                     logger.info(f"✓ Dynamic pod loaded for session {sid}")
                 
