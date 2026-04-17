@@ -387,6 +387,9 @@ async def serve_variant_manifest(
             session.pending_pod = None
             session.ad_state = AdState.ACTIVE
             session.pending_ad_tag = None
+            # The splice anchor is only needed for the first stitched response.
+            # Keeping it set pins subsequent manifests to an old media sequence.
+            session.splice_at_sequence = None
             session.last_live_sequence = max(
                 session.last_live_sequence or current_last_sequence,
                 current_next_sequence - 1,
@@ -446,7 +449,11 @@ async def serve_variant_manifest(
     if session.active_pod and not active_pod_already_injected:
         splice_at_sequence = None
         if session.active_pod.pod_id.startswith(f"midroll-{sid}-") and session.splice_at_sequence is not None:
-            splice_at_sequence = session.splice_at_sequence
+            # Safety valve for older sessions where splice anchor may still be set.
+            if current_last_sequence < session.splice_at_sequence:
+                splice_at_sequence = session.splice_at_sequence
+            else:
+                session.splice_at_sequence = None
 
         # Build variant with pre-roll injection
         rewritten, should_promote = build_variant_with_preroll(
